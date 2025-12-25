@@ -1,16 +1,14 @@
 import express from 'express';
 import Job from '../models/Job.js';
+import protect from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/', async (req, res) => {
+router.post('/', protect, async (req, res) => {
   try {
-    const { company, position, status } = req.body;
-
     const job = await Job.create({
-      company,
-      position,
-      status,
+      ...req.body,
+      user: req.user._id,
     });
 
     res.status(201).json(job);
@@ -19,21 +17,22 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
-    const jobs = await Job.find().sort({ createdAt: -1 });
+    const jobs = await Job.find({ user: req.user._id });
     res.json(jobs);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
 
-    if (!job) {
-      return res.status(404).json({ message: 'Job not found' });
+
+    if (!job || job.user.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'Not authorized' });
     }
 
     await job.deleteOne();
@@ -43,14 +42,14 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', protect, async (req, res) => {
   try {
     const { status } = req.body;
 
     const job = await Job.findById(req.params.id);
 
-    if (!job) {
-      return res.status(404).json({ message: 'Job not found' });
+    if (!job || job.user.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'Not authorized' });
     }
 
     job.status = status;
